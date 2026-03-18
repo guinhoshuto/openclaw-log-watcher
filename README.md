@@ -1,11 +1,12 @@
 # OpenClaw Logs Dashboard
 
-Small Node.js/Express app that reads `logs.json` produced by OpenClaw and serves a web dashboard:
+Node.js/Express app that reads **session `.jsonl` files** under the OpenClaw sessions directory (deduplicated by UUID) and serves a web dashboard:
 
+- **All historical sessions** (active `.jsonl`, then `.jsonl.reset.<ts>`, then `.jsonl.deleted.<ts>` per UUID — one source per session, no double-counting)
 - Sessions table (filters, sorting, pagination)
 - Charts (sessions/day and tokens/day)
-- Per-session JSON viewer
-- Per-session **session file** viewer (reads the `sessionFile` `.jsonl` and renders it as Table/Raw, with expandable rows)
+- Per-session JSON viewer (metadata from optional `sessions.json` / `logs.json` merged in)
+- Per-session **session file** viewer (the chosen `.jsonl`)
 
 ## Requirements
 
@@ -34,43 +35,50 @@ npm run dev
 
 ## Configuration
 
-The server reads configuration from environment variables:
+| Variable        | Description |
+|-----------------|-------------|
+| `PORT`          | HTTP port (default: `3001`) |
+| `SESSIONS_DIR`  | Folder with `*.jsonl` (default: `~/.openclaw/agents/main/sessions`) |
+| `LOGS_FILE`     | Optional path to `logs.json` — **metadata only** (merged by `sessionId`) |
 
-- `PORT`: HTTP port (default: `3001`)
-- `LOGS_FILE`: path to `logs.json` (default: `./logs.json`)
-
-Example:
+Example (e.g. server paths):
 
 ```bash
-PORT=8080 LOGS_FILE=/root/.openclaw/logs.json npm start
+SESSIONS_DIR=/root/.openclaw/agents/main/sessions \
+LOGS_FILE=/root/.openclaw/logs.json \
+PORT=8080 npm start
 ```
+
+### Session files (primary source)
+
+For each **base UUID**, exactly one file is used:
+
+1. `<uuid>.jsonl` if present  
+2. Else `<uuid>.jsonl.reset.<timestamp>` (newest timestamp if several)  
+3. Else `<uuid>.jsonl.deleted.<timestamp>` (newest if several)  
+
+Tokens and times are aggregated **only** from that file. `sessions.json` and `logs.json` enrich labels, origin, etc., but do not define history or token totals.
 
 ## API
 
 ### `GET /api/sessions`
 
-Returns an array of session objects derived from the `logs.json` root map (key → session object).
+Returns an array of session objects, each including at least:
 
-Notes:
-- The `skillsSnapshot.prompt` field is removed to avoid returning a huge compiled prompt blob.
+- `sessionId`, `key` (UUID), `sessionFile`, `fileKind` (`active` | `reset` | `deleted`)
+- `startAt`, `endAt`, `updatedAt`
+- `inputTokens`, `outputTokens`, `cacheRead`, `cacheWrite`, `totalTokens`, `model`
+
+`skillsSnapshot.prompt` is stripped when present to keep payloads small.
 
 ### `GET /api/session-file?path=/abs/path/to/session.jsonl`
 
-Reads the real OpenClaw `sessionFile` (`.jsonl`) and returns an array where each line is parsed as JSON.
+Reads a `.jsonl` under `SESSIONS_DIR` and returns one JSON object per line.
 
-- If the `path` does not exist: returns `404`
-- If a line is not valid JSON: it is returned as `{ "_raw": "<line>" }`
+- Path must resolve **inside** `SESSIONS_DIR` (403 otherwise)
 
-## UI usage
+## UI
 
-- **Filters**: date range, model, provider, origin
-- **Actions column**:
-  - `{ }` opens the full session JSON modal
-  - `≡` opens the session file modal (real `.jsonl` from `sessionFile`)
-- **Session file modal**:
-  - Toggle **Table/Raw**
-  - Click a row to expand (accordion) and show content blocks line-by-line
-  - Heatmap on token columns (Total tokens; and sessions table has heatmap for In/Out/Total)
-
-# openclaw-log-watcher
-# openclaw-log-watcher
+- **Filters**: date range, model, provider, origin  
+- **Source**: active vs archived reset/deleted file  
+- **Actions**: `{ }` session JSON, `≡` session file modal  

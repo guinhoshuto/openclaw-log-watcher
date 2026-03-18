@@ -292,6 +292,10 @@
     .badge-anthropic { background: #4c1d1d; color: #fca5a5; }
     .badge-openai    { background: #064e3b; color: #6ee7b7; }
     .badge-default   { background: var(--surface2); color: var(--muted); }
+    .badge-source-active  { background: #14532d; color: #86efac; }
+    .badge-source-reset   { background: #422006; color: #fcd34d; }
+    .badge-source-deleted { background: #3f3f46; color: #a1a1aa; }
+    table td.td-num { font-family: monospace; text-align: right; }
 
     .aborted-yes { color: var(--red); font-weight: 600; }
     .aborted-no  { color: var(--muted); }
@@ -702,8 +706,9 @@
       <div class="value yellow" id="stat-avg">—</div>
     </div>
     <div class="stat-card">
-      <div class="label">Cache Read</div>
+      <div class="label">Cache Read / Write</div>
       <div class="value green" id="stat-cache-read">—</div>
+      <div class="sub" id="stat-cache-write"></div>
     </div>
     <div class="stat-card">
       <div class="label">Aborted Sessions</div>
@@ -744,12 +749,15 @@
             <th data-col="inputTokens">In Tokens <span class="sort-icon">⇅</span></th>
             <th data-col="outputTokens">Out Tokens <span class="sort-icon">⇅</span></th>
             <th data-col="totalTokens">Total <span class="sort-icon">⇅</span></th>
+            <th data-col="cacheRead">Cache R <span class="sort-icon">⇅</span></th>
+            <th data-col="cacheWrite">Cache W <span class="sort-icon">⇅</span></th>
+            <th data-col="fileKind">Source <span class="sort-icon">⇅</span></th>
             <th data-col="abortedLastRun">Aborted <span class="sort-icon">⇅</span></th>
             <th style="cursor:default">Actions</th>
           </tr>
         </thead>
         <tbody id="sessions-tbody">
-          <tr><td colspan="13" class="loading">Loading…</td></tr>
+          <tr><td colspan="16" class="loading">Loading…</td></tr>
         </tbody>
       </table>
     </div>

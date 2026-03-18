@@ -56,7 +56,7 @@ function initFilterListeners() {
 /* ── Data loading ───────────────────────────────────────────────────── */
 async function loadData() {
   const tbody = document.getElementById('sessions-tbody');
-  tbody.innerHTML = '<tr><td colspan="13" class="loading">Loading…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="16" class="loading">Loading…</td></tr>';
 
   try {
     const res = await fetch('/api/sessions');
@@ -66,7 +66,7 @@ async function loadData() {
     populateFilterOptions();
     applyFilters();
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="13" class="empty">Error: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="16" class="empty">Error: ${err.message}</td></tr>`;
   }
 }
 
@@ -165,6 +165,7 @@ function updateStats() {
   const inTok   = s.reduce((a, x) => a + (x.inputTokens  || 0), 0);
   const outTok  = s.reduce((a, x) => a + (x.outputTokens || 0), 0);
   const cacheR  = s.reduce((a, x) => a + (x.cacheRead    || 0), 0);
+  const cacheW  = s.reduce((a, x) => a + (x.cacheWrite   || 0), 0);
   const aborted = s.filter(x => x.abortedLastRun).length;
   const avg     = total ? Math.round(totTok / total) : 0;
 
@@ -173,6 +174,7 @@ function updateStats() {
   setText('stat-tokens-sub', `↑ ${fmt(inTok)} in  ↓ ${fmt(outTok)} out`);
   setText('stat-avg',       fmt(avg));
   setText('stat-cache-read', fmt(cacheR));
+  setText('stat-cache-write', cacheW ? `write ${fmt(cacheW)}` : '');
   setText('stat-aborted',   fmt(aborted));
 }
 
@@ -308,7 +310,7 @@ function renderTable() {
 
   const tbody = document.getElementById('sessions-tbody');
   if (slice.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="13" class="empty">No sessions match the current filters.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="16" class="empty">No sessions match the current filters.</td></tr>';
   } else {
     tbody.innerHTML = slice.map(s => rowHTML(s, heatRanges)).join('');
   }
@@ -319,6 +321,7 @@ function renderTable() {
 function colValue(s, col) {
   if (col === 'origin_provider') return s.origin?.provider || '';
   if (col === 'origin_label')    return s.origin?.label    || '';
+  if (col === 'fileKind')        return s.fileKind || '';
   return s[col];
 }
 
@@ -338,6 +341,13 @@ function rowHTML(s, heat = {}) {
   const chatType       = s.chatType          || '—';
   const originProvider = s.origin?.provider  || '—';
   const badgeClass = badgeFor(originProvider);
+  const fk = s.fileKind || 'active';
+  const sourceBadge =
+    fk === 'active'
+      ? 'badge-source-active'
+      : fk === 'reset'
+        ? 'badge-source-reset'
+        : 'badge-source-deleted';
 
   const inStyle    = heat.in    ? tokenHeatStyle(s.inputTokens,  heat.in.min,    heat.in.max)    : '';
   const outStyle   = heat.out   ? tokenHeatStyle(s.outputTokens, heat.out.min,   heat.out.max)   : '';
@@ -355,6 +365,9 @@ function rowHTML(s, heat = {}) {
     <td class="muted"${inStyle}>${fmt(s.inputTokens)}</td>
     <td class="muted"${outStyle}>${fmt(s.outputTokens)}</td>
     <td${totStyle}>${fmt(s.totalTokens)}</td>
+    <td class="muted td-num">${fmt(s.cacheRead)}</td>
+    <td class="muted td-num">${fmt(s.cacheWrite)}</td>
+    <td><span class="badge ${sourceBadge}">${esc(fk)}</span></td>
     <td class="${s.abortedLastRun ? 'aborted-yes' : 'aborted-no'}">${s.abortedLastRun ? 'Yes' : 'No'}</td>
     <td class="actions-cell">
       <button class="btn-view" data-key="${esc(s.key)}" onclick="openModal(this.dataset.key)" title="Session JSON">{ }</button>
