@@ -56,7 +56,7 @@ function initFilterListeners() {
 /* ── Data loading ───────────────────────────────────────────────────── */
 async function loadData() {
   const tbody = document.getElementById('sessions-tbody');
-  tbody.innerHTML = '<tr><td colspan="16" class="loading">Loading…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="17" class="loading">Loading…</td></tr>';
 
   try {
     const res = await fetch('/api/sessions');
@@ -66,7 +66,7 @@ async function loadData() {
     populateFilterOptions();
     applyFilters();
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="16" class="empty">Error: ${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="17" class="empty">Error: ${err.message}</td></tr>`;
   }
 }
 
@@ -310,7 +310,7 @@ function renderTable() {
 
   const tbody = document.getElementById('sessions-tbody');
   if (slice.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="16" class="empty">No sessions match the current filters.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="17" class="empty">No sessions match the current filters.</td></tr>';
   } else {
     tbody.innerHTML = slice.map(s => rowHTML(s, heatRanges)).join('');
   }
@@ -368,6 +368,7 @@ function rowHTML(s, heat = {}) {
     <td class="muted td-num">${fmt(s.cacheRead)}</td>
     <td class="muted td-num">${fmt(s.cacheWrite)}</td>
     <td><span class="badge ${sourceBadge}">${esc(fk)}</span></td>
+    <td class="td-num muted">${s.resetCount > 0 ? s.resetCount : '—'}</td>
     <td class="${s.abortedLastRun ? 'aborted-yes' : 'aborted-no'}">${s.abortedLastRun ? 'Yes' : 'No'}</td>
     <td class="actions-cell">
       <button class="btn-view" data-key="${esc(s.key)}" onclick="openModal(this.dataset.key)" title="Session JSON">{ }</button>

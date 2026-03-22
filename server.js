@@ -150,7 +150,7 @@ function num(v) {
 }
 
 /**
- * Aggregate tokens and times from one .jsonl file (single source per UUID).
+ * Aggregate tokens and times from one .jsonl file.
  */
 function aggregateFromJsonl(filePath) {
   const result = {
@@ -252,6 +252,53 @@ function aggregateFromJsonl(filePath) {
   return result;
 }
 
+/**
+ * Aggregate tokens and times from ALL files in a group (active + resets + deleteds).
+ * This ensures historical token data is never lost when a session is reset daily.
+ */
+function aggregateAllFilesInGroup(group) {
+  const combined = {
+    sessionIdFromFile: null,
+    startAt: null,
+    endAt: null,
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheRead: 0,
+    cacheWrite: 0,
+    totalTokens: 0,
+    model: null,
+    resetCount: 0,
+  };
+
+  const allFiles = [];
+  if (group.active) allFiles.push(group.active);
+  for (const r of group.resets)   allFiles.push(r.path);
+  for (const d of group.deleteds) allFiles.push(d.path);
+
+  combined.resetCount = group.resets.length;
+
+  for (const fp of allFiles) {
+    const agg = aggregateFromJsonl(fp);
+    if (!combined.sessionIdFromFile && agg.sessionIdFromFile) {
+      combined.sessionIdFromFile = agg.sessionIdFromFile;
+    }
+    if (agg.startAt != null && (combined.startAt == null || agg.startAt < combined.startAt)) {
+      combined.startAt = agg.startAt;
+    }
+    if (agg.endAt != null && (combined.endAt == null || agg.endAt > combined.endAt)) {
+      combined.endAt = agg.endAt;
+    }
+    combined.inputTokens  += agg.inputTokens;
+    combined.outputTokens += agg.outputTokens;
+    combined.cacheRead    += agg.cacheRead;
+    combined.cacheWrite   += agg.cacheWrite;
+    combined.totalTokens  += agg.totalTokens;
+    if (agg.model) combined.model = agg.model;
+  }
+
+  return combined;
+}
+
 function stripSkillsPrompt(session) {
   if (!session?.skillsSnapshot) return session;
   const { prompt, ...rest } = session.skillsSnapshot;
@@ -314,7 +361,8 @@ function buildSessionList() {
     const { sessionFile, fileKind } = pickSessionFile(group);
     if (!sessionFile) continue;
 
-    const agg = aggregateFromJsonl(sessionFile);
+    // Aggregate ALL files (active + resets + deleteds) so token history survives daily resets
+    const agg = aggregateAllFilesInGroup(group);
     const sessionId = agg.sessionIdFromFile || uuid;
     const updatedAt = agg.endAt ?? agg.startAt ?? Date.now();
 
@@ -323,6 +371,7 @@ function buildSessionList() {
       sessionId,
       sessionFile,
       fileKind,
+      resetCount: agg.resetCount,
       startAt: agg.startAt,
       endAt: agg.endAt,
       updatedAt,
