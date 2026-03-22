@@ -46,19 +46,49 @@ function loadSessionsJsonMeta() {
   const data = safeReadJson(p);
   if (!data || typeof data !== 'object') return { bySessionId: new Map(), raw: null };
   const bySessionId = new Map();
+
   for (const [mapKey, s] of Object.entries(data)) {
     if (!s || typeof s !== 'object') continue;
-    const sid = s.sessionId || mapKey;
+
+    // Derive a human label from the mapKey when none is set
+    const derivedLabel = s.label || _labelFromMapKey(mapKey);
+    const enriched = { mapKey, label: derivedLabel, ...s };
+
     const setIf = k => {
       if (!k) return;
       const nk = String(k).toLowerCase();
-      if (!bySessionId.has(nk)) bySessionId.set(nk, { mapKey, ...s });
+      if (!bySessionId.has(nk)) bySessionId.set(nk, enriched);
     };
-    setIf(sid);
-    setIf(mapKey);
     setIf(s.sessionId);
+    setIf(mapKey);
+
+    // Also index by the UUID inside sessionFile path so lookup always works
+    const sf = s.sessionFile;
+    if (sf && typeof sf === 'string') {
+      const base = path.basename(sf).replace(/\.jsonl.*$/, '').toLowerCase();
+      if (base) setIf(base);
+    }
   }
   return { bySessionId, raw: data };
+}
+
+/** Derive a readable label from an agent mapKey like agent:main:cron:xxx:run:yyy */
+function _labelFromMapKey(mapKey) {
+  if (!mapKey) return null;
+  // e.g. agent:main:cron:uuid → Cron
+  //      agent:main:discord:channel:id → Discord #id
+  //      agent:main:telegram:direct:id → Telegram
+  //      agent:main:main → Main
+  const parts = String(mapKey).split(':');
+  // parts[0]=agent parts[1]=agentName parts[2]=type ...
+  const type = parts[2];
+  if (!type) return mapKey;
+  if (type === 'main') return 'Main';
+  if (type === 'cron') return `Cron`;
+  if (type === 'discord') return `Discord ${parts[4] ? '#' + parts[4] : ''}`.trim();
+  if (type === 'telegram') return `Telegram`;
+  if (type === 'hook') return `Hook: ${parts[3] || ''}`;
+  return type;
 }
 
 function loadLogsJsonMeta() {
@@ -323,20 +353,29 @@ function mergeMeta(base, sessionsMeta, logsMeta) {
     cleaned.skillsSnapshot = r;
   }
 
+  // Token counts from file aggregation are always authoritative (sessions.json can be stale)
+  // Use file tokens when non-zero; fall back to sessions.json tokens otherwise
+  const bestInput  = base.inputTokens  || cleaned.inputTokens  || 0;
+  const bestOutput = base.outputTokens || cleaned.outputTokens || 0;
+  const bestCacheR = base.cacheRead    || cleaned.cacheRead    || 0;
+  const bestCacheW = base.cacheWrite   || cleaned.cacheWrite   || 0;
+  const bestTotal  = base.totalTokens  || cleaned.totalTokens  || 0;
+
   return {
     ...cleaned,
     key: base.key,
     sessionId: base.sessionId,
     sessionFile: base.sessionFile,
     fileKind: base.fileKind,
+    resetCount: base.resetCount,
     startAt: base.startAt,
     endAt: base.endAt,
     updatedAt: base.updatedAt,
-    inputTokens: base.inputTokens,
-    outputTokens: base.outputTokens,
-    cacheRead: base.cacheRead,
-    cacheWrite: base.cacheWrite,
-    totalTokens: base.totalTokens,
+    inputTokens: bestInput,
+    outputTokens: bestOutput,
+    cacheRead: bestCacheR,
+    cacheWrite: bestCacheW,
+    totalTokens: bestTotal,
     model: base.model || cleaned.model,
   };
 }
